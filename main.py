@@ -1,5 +1,5 @@
 import random
-import asyncio  # 导入 asyncio 库
+import asyncio
 from astrbot.api.event import filter
 from astrbot.api.star import Context, Star, register
 from astrbot.core.config.astrbot_config import AstrBotConfig
@@ -13,7 +13,7 @@ from .model import GameManager
     "astrbot_plugin_roulette",
     "Zhalslar",
     "俄罗斯转盘赌，中枪者禁言",
-    "1.0.2"  # 版本号更新
+    "1.0.2"
 )
 class RoulettePlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -23,7 +23,6 @@ class RoulettePlugin(Star):
             int(x) for x in config.get("ban_duration_str", "30-300").split("-")
         ]
         self.PERSUASION_QUOTES: list = [
-            # ... (语录列表保持不变)
             "赌博一时爽，一直赌博一直爽，但最后爽的只有赌场老板！",
             "别再赌了，回头是岸！",
             "赌博是无底洞，早回头早安心。",
@@ -46,7 +45,6 @@ class RoulettePlugin(Star):
         # 用于存储超时任务，键为 group_id，值为 asyncio.Task 对象
         self.timeout_tasks: dict[str, asyncio.Task] = {}
     
-    # start_wheel 函數保持不變...
     @filter.command("转盘", alias={"轮盘", "开启转盘"})
     async def start_wheel(self, event: AstrMessageEvent):
         """转盘@某人 不@表示进入多人模式"""
@@ -67,16 +65,12 @@ class RoulettePlugin(Star):
         room = self.gm.create_room(kids=kids, ban_time=duration)
         if not room:
             reply = ""
-            if self.gm.has_room(sender_id):
-                reply = "你在游戏中..."
-            if self.gm.has_room(target_id):
-                reply = "对方游戏中..."
-            if self.gm.has_room(group_id):
-                reply = "本群游戏中..."
+            if self.gm.has_room(sender_id): reply = "你在游戏中..."
+            if self.gm.has_room(target_id): reply = "对方游戏中..."
+            if self.gm.has_room(group_id): reply = "本群游戏中..."
             yield event.plain_result(reply)
             return
 
-        # 开盘提示
         if room.players:
             user_name = await get_name(event, sender_id)
             target_name = await get_name(event, target_id) if target_id else ""
@@ -88,14 +82,12 @@ class RoulettePlugin(Star):
         )
         return
 
-    # --- shoot_wheel 函數重大修改 ---
     @filter.command("开枪")
     async def shoot_wheel(self, event: AstrMessageEvent):
         sender_id = event.get_sender_id()
         group_id = event.get_group_id()
-        kids = [sender_id, "", group_id]
+        room = self.gm.get_room(kids=[sender_id, "", group_id])
 
-        room = self.gm.get_room(kids)
         if not room:
             yield event.plain_result("请先开启转盘")
             return
@@ -104,7 +96,6 @@ class RoulettePlugin(Star):
             yield event.plain_result("本轮不是你的回合")
             return
 
-        # --- 核心修改：玩家行动时，取消可能存在的超时任务 ---
         if group_id in self.timeout_tasks:
             self.timeout_tasks[group_id].cancel()
             del self.timeout_tasks[group_id]
@@ -114,52 +105,46 @@ class RoulettePlugin(Star):
         if room.shoot(sender_id):
             await ban(event, room.ban_time)
             reply = f"Bang！{user_name}被禁言{room.ban_time}秒！{random.choice(self.PERSUASION_QUOTES)}"
-            self.gm.del_room(kids)
+            # 使用包含所有参与者的列表来清理房间
+            self.gm.del_room(kids=room.players + [group_id])
         else:
             reply = f"【{user_name}】开了一枪没响，还剩【{6 - room.round}】发"
             next_player_id = room.players[room.next_idx] if room.next_idx is not None else None
-
             if next_player_id:
                 player_name = await get_name(event, user_id=next_player_id)
                 reply += f", {player_name}，该你了！"
 
-                # --- 核心修改：检查是否触发了超时条件 ---
                 is_last_round = (6 - room.round) == 1
                 if is_last_round:
                     reply += "\n\n⚠️ 你只剩下最后一发子弹，命运掌握在自己手中！\n请在3分钟内【开枪】或【认输】，否则将自动判负。"
                     
-                    # 定义一个协程，用于执行超时逻辑
                     async def auto_surrender_coro():
                         try:
                             await asyncio.sleep(180) # 等待3分钟
                             logger.info(f"玩家 {player_name}({next_player_id}) 在群 {group_id} 的游戏超时。")
-                            # 超时后执行的逻辑
                             timeout_event = event.fork(user_id=next_player_id)
                             await ban(timeout_event, room.ban_time)
                             timeout_reply = (
                                 f"玩家 {player_name} 在命运抉择面前犹豫了超过3分钟，已自动判负！\n"
                                 f"被禁言 {room.ban_time} 秒！{random.choice(self.PERSUASION_QUOTES)}"
                             )
-                            # 使用 event.yield_result 而不是 yield event.plain_result
                             await event.yield_result(event.plain(timeout_reply))
-                            self.gm.del_room(kids=[next_player_id, "", group_id])
+                            # 使用包含所有参与者的列表来清理房间
+                            self.gm.del_room(kids=room.players + [group_id])
                             if group_id in self.timeout_tasks:
                                 del self.timeout_tasks[group_id]
                         except asyncio.CancelledError:
                             logger.info(f"群 {group_id} 的超时任务被取消。")
                     
-                    # 创建并存储这个超时任务
                     self.timeout_tasks[group_id] = asyncio.create_task(auto_surrender_coro())
 
         yield event.plain_result(reply)
     
-    # --- surrender_game 和 exit_game 函數需要添加任务取消逻辑 ---
     @filter.command("认输", alias={"玩不起"})
     async def surrender_game(self, event: AstrMessageEvent):
         user_id = event.get_sender_id()
         group_id = event.get_group_id()
-        kids = [user_id, "", group_id]
-        room = self.gm.get_room(kids)
+        room = self.gm.get_room(kids=[user_id, "", group_id])
 
         if not room:
             yield event.plain_result("你没有正在进行的转盘游戏")
@@ -169,7 +154,6 @@ class RoulettePlugin(Star):
             yield event.plain_result("还没轮到你，不能认输哦！")
             return
 
-        # --- 核心修改：玩家行动时，取消可能存在的超时任务 ---
         if group_id in self.timeout_tasks:
             self.timeout_tasks[group_id].cancel()
             del self.timeout_tasks[group_id]
@@ -180,15 +164,15 @@ class RoulettePlugin(Star):
             f"{user_name} 选择了认输，直面惩罚！"
             f"被禁言 {room.ban_time} 秒！{random.choice(self.PERSUASION_QUOTES)}"
         )
-        self.gm.del_room(kids)
+        # 使用包含所有参与者的列表来清理房间
+        self.gm.del_room(kids=room.players + [group_id])
         yield event.plain_result(reply)
 
     @filter.command("退出", alias={"结束游戏"})
     async def exit_game(self, event: AstrMessageEvent):
         user_id = event.get_sender_id()
         group_id = event.get_group_id()
-        kids = [user_id, "", group_id]
-        room = self.gm.get_room(kids)
+        room = self.gm.get_room(kids=[user_id, "", group_id])
 
         if not room:
             yield event.plain_result("你没有正在进行的转盘游戏")
@@ -199,10 +183,10 @@ class RoulettePlugin(Star):
             yield event.plain_result("只剩最后一发，命运已定，无法退出！请选择【开枪】或【认输】。")
             return
 
-        # --- 核心修改：游戏结束时，取消可能存在的超时任务 ---
         if group_id in self.timeout_tasks:
             self.timeout_tasks[group_id].cancel()
             del self.timeout_tasks[group_id]
 
-        self.gm.del_room(kids)
+        # 使用包含所有参与者的列表来清理房间
+        self.gm.del_room(kids=room.players + [group_id])
         yield event.plain_result("游戏已由玩家主动退出，无人受罚。")
