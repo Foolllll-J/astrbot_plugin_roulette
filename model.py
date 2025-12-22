@@ -73,16 +73,18 @@ class GameManager:
     ) -> Room | None:
         """创建房间"""
         with self._lock:
-            for kid in kids:
-                if kid in self.room:
+            # 双人模式：检查双方是否在游戏中
+            if kids[0] and kids[1]:
+                if kids[0] in self.room or kids[1] in self.room:
                     return None
-            if kids[0] and kids[1]:  # 固定列表
                 room = Room(players=kids[:2], ban_time=ban_time)
                 self.room[kids[0]] = room
                 self.room[kids[1]] = room
                 return room
+            # 多人模式：只检查群是否已有多人游戏
             elif kids[2]:
-                # 多人模式
+                if kids[2] in self.room:
+                    return None
                 room = Room(players=[], ban_time=ban_time)
                 self.room[kids[2]] = room
                 return room

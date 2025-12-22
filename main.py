@@ -91,9 +91,11 @@ class RoulettePlugin(Star):
         
         # 解析禁言时长参数
         duration = None
+        custom_duration = False  # 标记是否为自定义时长
         if len(args) >= 2 and args[-1].isdigit():
             # 有自定义时长
             duration = int(args[-1])
+            custom_duration = True
             if duration > self.MAX_BAN_DURATION:
                 duration = self.MAX_BAN_DURATION
                 yield event.plain_result(f"⚠️ 禁言时长不能超过24小时，已设置为最大值 {self.MAX_BAN_DURATION} 秒")
@@ -116,7 +118,9 @@ class RoulettePlugin(Star):
             reply = ""
             if self.gm.has_room(sender_id): reply = "你在游戏中..."
             if self.gm.has_room(target_id): reply = "对方游戏中..."
-            if self.gm.has_room(group_id): reply = "本群游戏中..."
+            # 双人转盘和多人转盘可以并存，不检查群游戏
+            if not target_id and self.gm.has_room(group_id): 
+                reply = "本群游戏中..."
             yield event.plain_result(reply)
             return
 
@@ -124,16 +128,28 @@ class RoulettePlugin(Star):
             user_name = await get_name(event, sender_id)
             target_name = await get_name(event, target_id) if target_id else ""
             # 使用chain格式，@发起者并说明规则
-            chain = [
-                Comp_Plain(f"{user_name} VS {target_name}\n"),
-                Comp_Plain(f"🎲 双人转盘对决开始！禁言时长：{duration}秒\n"),
-                Comp_Plain("发起者先手，"),
-                Comp_At(qq=sender_id),
-                Comp_Plain(" 请先开枪！")
-            ]
+            if custom_duration:
+                chain = [
+                    Comp_Plain(f"{user_name} VS {target_name}\n"),
+                    Comp_Plain(f"🎲 双人转盘对决开始！禁言时长：{duration}秒\n"),
+                    Comp_Plain("发起者先手，"),
+                    Comp_At(qq=sender_id),
+                    Comp_Plain(" 请先开枪！")
+                ]
+            else:
+                chain = [
+                    Comp_Plain(f"{user_name} VS {target_name}\n"),
+                    Comp_Plain("🎲 双人转盘对决开始！\n"),
+                    Comp_Plain("发起者先手，"),
+                    Comp_At(qq=sender_id),
+                    Comp_Plain(" 请先开枪！")
+                ]
             yield event.chain_result(chain)
         else:
-            yield event.plain_result(f"本群转盘开始，禁言时长：{duration}秒，请开枪！")
+            if custom_duration:
+                yield event.plain_result(f"本群转盘开始，禁言时长：{duration}秒，请开枪！")
+            else:
+                yield event.plain_result("本群转盘开始，请开枪！")
         
         # 设置游戏超时
         self._set_game_timeout(event, group_id, room)
@@ -147,7 +163,13 @@ class RoulettePlugin(Star):
     async def shoot_wheel(self, event: AstrMessageEvent):
         sender_id = event.get_sender_id()
         group_id = event.get_group_id()
-        room = self.gm.get_room(kids=[sender_id, "", group_id])
+        
+        # 优先查找双人转盘（通过sender_id）
+        room = self.gm.get_room(kids=[sender_id, "", ""])
+        
+        # 如果没有双人转盘，查找多人转盘（通过group_id）
+        if not room:
+            room = self.gm.get_room(kids=["", "", group_id])
 
         if not room:
             yield event.plain_result("请先开启转盘")
@@ -251,7 +273,13 @@ class RoulettePlugin(Star):
     async def surrender_game(self, event: AstrMessageEvent):
         user_id = event.get_sender_id()
         group_id = event.get_group_id()
-        room = self.gm.get_room(kids=[user_id, "", group_id])
+        
+        # 优先查找双人转盘
+        room = self.gm.get_room(kids=[user_id, "", ""])
+        
+        # 如果没有双人转盘，查找多人转盘
+        if not room:
+            room = self.gm.get_room(kids=["", "", group_id])
 
         if not room:
             yield event.plain_result("你没有正在进行的转盘游戏")
@@ -290,7 +318,13 @@ class RoulettePlugin(Star):
     async def exit_game(self, event: AstrMessageEvent):
         user_id = event.get_sender_id()
         group_id = event.get_group_id()
-        room = self.gm.get_room(kids=[user_id, "", group_id])
+        
+        # 优先查找双人转盘
+        room = self.gm.get_room(kids=[user_id, "", ""])
+        
+        # 如果没有双人转盘，查找多人转盘
+        if not room:
+            room = self.gm.get_room(kids=["", "", group_id])
 
         if not room:
             yield event.plain_result("你没有正在进行的转盘游戏")
