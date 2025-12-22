@@ -7,7 +7,7 @@
     },
     "game_timeout": {
         "description": "游戏超时时长（秒）",
-        "type": "number",
+        "type": "int",
         "hint": "距离上次开枪后多久无人开枪将自动结束，0表示不超时",
         "default": 3600
     }
