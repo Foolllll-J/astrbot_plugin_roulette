@@ -89,24 +89,30 @@ class RoulettePlugin(Star):
         """转盘@某人 [秒数] 不@表示进入多人模式"""
         args = event.message_str.split()
         
+        target_id = get_at_id(event)
+        sender_id = event.get_sender_id()
+        group_id = event.get_group_id()
+        
         # 解析禁言时长参数
         duration = None
         custom_duration = False  # 标记是否为自定义时长
         if len(args) >= 2 and args[-1].isdigit():
-            # 有自定义时长
-            duration = int(args[-1])
-            custom_duration = True
-            if duration > self.MAX_BAN_DURATION:
-                duration = self.MAX_BAN_DURATION
-                yield event.plain_result(f"⚠️ 禁言时长不能超过24小时，已设置为最大值 {self.MAX_BAN_DURATION} 秒")
+            # 多人模式不允许自定义时长
+            if not target_id:
+                # 使用随机时长
+                duration = random.randint(*self.ban_duration)
+                custom_duration = False
+            else:
+                # 双人模式允许自定义时长
+                duration = int(args[-1])
+                custom_duration = True
+                if duration > self.MAX_BAN_DURATION:
+                    duration = self.MAX_BAN_DURATION
+                    yield event.plain_result(f"⚠️ 禁言时长不能超过24小时，已设置为最大值 {self.MAX_BAN_DURATION} 秒")
         
         if duration is None:
             # 使用随机时长
             duration = random.randint(*self.ban_duration)
-
-        target_id = get_at_id(event)
-        sender_id = event.get_sender_id()
-        group_id = event.get_group_id()
 
         if sender_id == target_id:
             yield event.plain_result("不能和自己玩哦！")
@@ -128,26 +134,18 @@ class RoulettePlugin(Star):
             user_name = await get_name(event, sender_id)
             target_name = await get_name(event, target_id) if target_id else ""
             # 使用chain格式，@发起者并说明规则
+            chain = []
             if custom_duration:
-                chain = [
-                    Comp_Plain(f"{user_name} VS {target_name}\n"),
-                    Comp_Plain(f"🎲 双人转盘对决开始！禁言时长：{duration}秒\n"),
-                    Comp_Plain("发起者先手，"),
-                    Comp_At(qq=sender_id),
-                    Comp_Plain(" 请先开枪！")
-                ]
+                text = f"🎲 {user_name} VS {target_name}\n双人转盘对决开始！惩罚时长：{duration}秒\n发起者先手，"
             else:
-                chain = [
-                    Comp_Plain(f"{user_name} VS {target_name}\n"),
-                    Comp_Plain("🎲 双人转盘对决开始！\n"),
-                    Comp_Plain("发起者先手，"),
-                    Comp_At(qq=sender_id),
-                    Comp_Plain(" 请先开枪！")
-                ]
+                text = f"🎲 {user_name} VS {target_name}\n双人转盘对决开始！\n发起者先手，"
+            chain.append(Comp_Plain(text))
+            chain.append(Comp_At(qq=sender_id))
+            chain.append(Comp_Plain(" 请先开枪！"))
             yield event.chain_result(chain)
         else:
             if custom_duration:
-                yield event.plain_result(f"本群转盘开始，禁言时长：{duration}秒，请开枪！")
+                yield event.plain_result(f"本群转盘开始，惩罚时长：{duration}秒，请开枪！")
             else:
                 yield event.plain_result("本群转盘开始，请开枪！")
         
@@ -214,25 +212,20 @@ class RoulettePlugin(Star):
             
             if next_player_id:
                 # 双人模式，@下一个玩家
-                player_name = await get_name(event, user_id=next_player_id)
-                
                 is_last_round = (6 - room.round) == 1
                 if is_last_round:
                     # 最后一发，@玩家并给出警告
-                    chain = [
-                        Comp_Plain(reply + "\n\n"),
-                        Comp_At(qq=next_player_id),
-                        Comp_Plain(" ⚠️ 你只剩下最后一发子弹，命运掌握在自己手中！\n"),
-                        Comp_Plain("请在3分钟内【开枪】或【认输】，否则将自动判负。")
-                    ]
+                    chain = []
+                    chain.append(Comp_Plain(reply + "，"))
+                    chain.append(Comp_At(qq=next_player_id))
+                    chain.append(Comp_Plain(" ⚠️ 你只剩下最后一发子弹，命运掌握在自己手中！\n请在3分钟内【开枪】或【认输】，否则将自动判负。"))
                     yield event.chain_result(chain)
                 else:
                     # 普通回合，@下一个玩家
-                    chain = [
-                        Comp_Plain(reply + "\n"),
-                        Comp_At(qq=next_player_id),
-                        Comp_Plain(f" {player_name}，该你了！")
-                    ]
+                    chain = []
+                    chain.append(Comp_Plain(reply + "，"))
+                    chain.append(Comp_At(qq=next_player_id))
+                    chain.append(Comp_Plain(" 该你了！"))
                     yield event.chain_result(chain)
                 
                 if is_last_round:
