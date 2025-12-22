@@ -108,7 +108,7 @@ class RoulettePlugin(Star):
                 custom_duration = True
                 if duration > self.MAX_BAN_DURATION:
                     duration = self.MAX_BAN_DURATION
-                    yield event.plain_result(f"⚠️ 禁言时长不能超过24小时，已设置为最大值 {self.MAX_BAN_DURATION} 秒")
+                    logger.info(f"禁言时长不能超过24小时，已设置为最大值 {self.MAX_BAN_DURATION} 秒")
         
         if duration is None:
             # 使用随机时长
@@ -162,12 +162,8 @@ class RoulettePlugin(Star):
         sender_id = event.get_sender_id()
         group_id = event.get_group_id()
         
-        # 优先查找双人转盘（通过sender_id）
-        room = self.gm.get_room(kids=[sender_id, "", ""])
-        
-        # 如果没有双人转盘，查找多人转盘（通过group_id）
-        if not room:
-            room = self.gm.get_room(kids=["", "", group_id])
+        # 查找房间（优先双人，其次多人）
+        room = self.gm.get_room(kids=[sender_id, "", group_id])
 
         if not room:
             yield event.plain_result("请先开启转盘")
@@ -223,7 +219,7 @@ class RoulettePlugin(Star):
                     chain = []
                     chain.append(Comp_Plain(reply + "，"))
                     chain.append(Comp_At(qq=next_player_id))
-                    chain.append(Comp_Plain(" ⚠️ 你只剩下最后一发子弹，命运掌握在自己手中！\n请在3分钟内【开枪】或【认输】，否则将自动判负。"))
+                    chain.append(Comp_Plain("，你只剩下最后一发子弹，命运掌握在自己手中！\n请在3分钟内【开枪】或【认输】，否则将自动判负。"))
                     yield event.chain_result(chain)
                 else:
                     # 普通回合，@下一个玩家
@@ -277,12 +273,8 @@ class RoulettePlugin(Star):
         user_id = event.get_sender_id()
         group_id = event.get_group_id()
         
-        # 优先查找双人转盘
-        room = self.gm.get_room(kids=[user_id, "", ""])
-        
-        # 如果没有双人转盘，查找多人转盘
-        if not room:
-            room = self.gm.get_room(kids=["", "", group_id])
+        # 查找房间（优先双人，其次多人）
+        room = self.gm.get_room(kids=[user_id, "", group_id])
 
         if not room:
             yield event.plain_result("你没有正在进行的转盘游戏")
@@ -327,12 +319,8 @@ class RoulettePlugin(Star):
         user_id = event.get_sender_id()
         group_id = event.get_group_id()
         
-        # 优先查找双人转盘
-        room = self.gm.get_room(kids=[user_id, "", ""])
-        
-        # 如果没有双人转盘，查找多人转盘
-        if not room:
-            room = self.gm.get_room(kids=["", "", group_id])
+        # 查找房间（优先双人，其次多人）
+        room = self.gm.get_room(kids=[user_id, "", group_id])
 
         if not room:
             yield event.plain_result("你没有正在进行的转盘游戏")
