@@ -1,8 +1,14 @@
 {
     "ban_duration_str": {
-        "description": "禁言时间范围",
+        "description": "禁言时间范围（秒）",
         "type": "string",
         "hint": "单位为秒，例如：30-300",
         "default": "30-300"
+    },
+    "game_timeout": {
+        "description": "游戏超时时长（秒）",
+        "type": "number",
+        "hint": "距离上次开枪后多久无人开枪将自动结束，0表示不超时",
+        "default": 3600
     }
 }
