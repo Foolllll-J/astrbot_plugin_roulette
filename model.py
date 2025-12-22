@@ -72,44 +72,58 @@ class GameManager:
         self, kids: list[str], ban_time: int = 0
     ) -> Room | None:
         """创建房间"""
+        sender_id, target_id, group_id = kids[0], kids[1], kids[2]
         with self._lock:
             # 双人模式：检查双方是否在游戏中
-            if kids[0] and kids[1]:
-                if kids[0] in self.room or kids[1] in self.room:
+            if sender_id and target_id:
+                k1 = f"{group_id}:{sender_id}"
+                k2 = f"{group_id}:{target_id}"
+                if k1 in self.room or k2 in self.room:
                     return None
-                room = Room(players=kids[:2], ban_time=ban_time)
-                self.room[kids[0]] = room
-                self.room[kids[1]] = room
+                room = Room(players=[sender_id, target_id], ban_time=ban_time)
+                self.room[k1] = room
+                self.room[k2] = room
                 return room
             # 多人模式：只检查群是否已有多人游戏
-            elif kids[2]:
-                if kids[2] in self.room:
+            elif group_id:
+                k_group = f"{group_id}:group"
+                if k_group in self.room:
                     return None
                 room = Room(players=[], ban_time=ban_time)
-                self.room[kids[2]] = room
+                self.room[k_group] = room
                 return room
 
 
     def get_room(self, kids: list[str]) -> Room | None:
         """获取房间"""
+        sender_id, target_id, group_id = kids[0], kids[1], kids[2]
         with self._lock:
-            for kid in kids:
-                if room := self.room.get(kid):
-                    return room
+            if sender_id:
+                if room := self.room.get(f"{group_id}:{sender_id}"): return room
+            if target_id:
+                if room := self.room.get(f"{group_id}:{target_id}"): return room
+            if group_id:
+                if room := self.room.get(f"{group_id}:group"): return room
             return None
 
 
-    def has_room(self, kid: str) -> bool:
+    def has_room(self, kid: str, group_id: str) -> bool:
         """玩家是否已在房间"""
         with self._lock:
-            return kid in self.room
+            return f"{group_id}:{kid}" in self.room
 
-    def del_room(self, kids: list[str]):
+    def del_room(self, group_id: str, players: list[str] = None):
         """即销毁房间"""
         with self._lock:
-            for kid in kids:
-                if kid in self.room:
-                    self.room.pop(kid)
+            if players:
+                for p in players:
+                    k = f"{group_id}:{p}"
+                    if k in self.room:
+                        self.room.pop(k)
+            
+            k_group = f"{group_id}:group"
+            if k_group in self.room:
+                self.room.pop(k_group)
 
 
 

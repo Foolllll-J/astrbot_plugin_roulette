@@ -69,9 +69,9 @@ class RoulettePlugin(Star):
                 
                 # 清理房间
                 if room.players:
-                    self.gm.del_room(kids=room.players + [group_id])
+                    self.gm.del_room(group_id=group_id, players=room.players)
                 else:
-                    self.gm.del_room(kids=["", "", group_id])
+                    self.gm.del_room(group_id=group_id)
                 
                 # 发送超时提示
                 timeout_msg = f"⏱️ 转盘游戏超时（{self.game_timeout}秒无人开枪），已自动结束，无人受罚。"
@@ -122,10 +122,10 @@ class RoulettePlugin(Star):
         room = self.gm.create_room(kids=kids, ban_time=duration)
         if not room:
             reply = ""
-            if self.gm.has_room(sender_id): reply = "你在游戏中..."
-            if self.gm.has_room(target_id): reply = "对方游戏中..."
+            if self.gm.has_room(sender_id, group_id): reply = "你在游戏中..."
+            if target_id and self.gm.has_room(target_id, group_id): reply = "对方游戏中..."
             # 双人转盘和多人转盘可以并存，不检查群游戏
-            if not target_id and self.gm.has_room(group_id): 
+            if not target_id and self.gm.get_room(["", "", group_id]): 
                 reply = "本群游戏中..."
             yield event.plain_result(reply)
             return
@@ -198,13 +198,18 @@ class RoulettePlugin(Star):
             all_participants = room.get_all_participants()
             winner_ids = [p for p in all_participants if p != sender_id]
             is_pvp = len(room.players) == 2
-            self.stats.record_game_result(sender_id, winner_ids, is_pvp)
+            
+            # 多人模式只记录败者，不记录胜者
+            if not is_pvp:
+                winner_ids = []
+                
+            self.stats.record_game_result(sender_id, winner_ids, is_pvp, group_id)
             
             await ban(event, room.ban_time)
             reply = f"Bang！{user_name}被禁言{room.ban_time}秒！{random.choice(self.PERSUASION_QUOTES)}"
             yield event.plain_result(reply)
             # 使用包含所有参与者的列表来清理房间
-            self.gm.del_room(kids=room.players + [group_id])
+            self.gm.del_room(group_id=group_id, players=room.players)
         else:
             # 没中枪
             reply = f"【{user_name}】开了一枪没响，还剩【{6 - room.round}】发"
@@ -238,7 +243,12 @@ class RoulettePlugin(Star):
                             all_participants = room.get_all_participants()
                             winner_ids = [p for p in all_participants if p != next_player_id]
                             is_pvp = len(room.players) == 2
-                            self.stats.record_game_result(next_player_id, winner_ids, is_pvp)
+                            
+                            # 多人模式只记录败者，不记录胜者
+                            if not is_pvp:
+                                winner_ids = []
+                                
+                            self.stats.record_game_result(next_player_id, winner_ids, is_pvp, group_id)
                             
                             timeout_event = event.fork(user_id=next_player_id)
                             await ban(timeout_event, room.ban_time)
@@ -248,7 +258,7 @@ class RoulettePlugin(Star):
                             )
                             await event.yield_result(event.plain(timeout_reply))
                             # 使用包含所有参与者的列表来清理房间
-                            self.gm.del_room(kids=room.players + [group_id])
+                            self.gm.del_room(group_id=group_id, players=room.players)
                             if group_id in self.timeout_tasks:
                                 del self.timeout_tasks[group_id]
                         except asyncio.CancelledError:
@@ -296,7 +306,12 @@ class RoulettePlugin(Star):
         all_participants = room.get_all_participants()
         winner_ids = [p for p in all_participants if p != user_id]
         is_pvp = len(room.players) == 2
-        self.stats.record_game_result(user_id, winner_ids, is_pvp)
+        
+        # 多人模式只记录败者，不记录胜者
+        if not is_pvp:
+            winner_ids = []
+            
+        self.stats.record_game_result(user_id, winner_ids, is_pvp, group_id)
         
         await ban(event, room.ban_time)
         reply = (
@@ -304,7 +319,7 @@ class RoulettePlugin(Star):
             f"被禁言 {room.ban_time} 秒！{random.choice(self.PERSUASION_QUOTES)}"
         )
         # 使用包含所有参与者的列表来清理房间
-        self.gm.del_room(kids=room.players + [group_id])
+        self.gm.del_room(group_id=group_id, players=room.players)
         yield event.plain_result(reply)
 
     @filter.command("退出", alias={"结束游戏"})
@@ -337,7 +352,7 @@ class RoulettePlugin(Star):
             del self.game_timeout_tasks[group_id]
 
         # 使用包含所有参与者的列表来清理房间
-        self.gm.del_room(kids=room.players + [group_id])
+        self.gm.del_room(group_id=group_id, players=room.players)
         yield event.plain_result("游戏已由玩家主动退出，无人受罚。")
     
     @filter.command("结束转盘")
@@ -371,14 +386,15 @@ class RoulettePlugin(Star):
             del self.game_timeout_tasks[group_id]
         
         # 清理多人模式房间
-        self.gm.del_room(kids=["", "", group_id])
+        self.gm.del_room(group_id=group_id)
         yield event.plain_result("管理员已强制结束当前群的多人转盘游戏，无人受罚。")
     
     @filter.command("我的战绩", alias={"转盘战绩", "查看战绩"})
     async def my_stats(self, event: AstrMessageEvent):
         """查看个人转盘战绩"""
         user_id = event.get_sender_id()
-        stats = self.stats.get_user_stats(user_id)
+        group_id = event.get_group_id()
+        stats = self.stats.get_user_stats(user_id, group_id)
         
         if not stats:
             yield event.plain_result("你还没有参与过转盘游戏哦！")
@@ -416,7 +432,8 @@ class RoulettePlugin(Star):
             yield event.plain_result("不能查看与自己的对战记录哦！")
             return
         
-        pvp_stats = self.stats.get_pvp_stats(sender_id, target_id)
+        group_id = event.get_group_id()
+        pvp_stats = self.stats.get_pvp_stats(sender_id, target_id, group_id)
         
         if not pvp_stats:
             sender_name = await get_name(event, sender_id)
@@ -449,7 +466,8 @@ class RoulettePlugin(Star):
     @filter.command("赌圣榜", alias={"赌圣排行榜", "胜率排行"})
     async def top_players(self, event: AstrMessageEvent):
         """查看胜率排行榜（至少参与5局）"""
-        top_list = self.stats.get_top_players(min_games=5, limit=5)
+        group_id = event.get_group_id()
+        top_list = self.stats.get_top_players(group_id=group_id, min_games=5, limit=5)
         
         if not top_list:
             yield event.plain_result("暂时还没有符合条件的赌圣（至少参与5局）")
