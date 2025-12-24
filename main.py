@@ -411,44 +411,46 @@ class RoulettePlugin(Star):
         """查看与某人的对战记录，需要@对方"""
         sender_id = event.get_sender_id()
         target_id = get_at_id(event)
-        
+
         if not target_id:
             yield event.plain_result("请@你想查看对战记录的人")
             return
-        
+
         if sender_id == target_id:
             yield event.plain_result("不能查看与自己的对战记录哦！")
             return
-        
+
         group_id = event.get_group_id()
         pvp_stats = self.stats.get_pvp_stats(sender_id, target_id, group_id)
-        
+
         if not pvp_stats:
             sender_name = await get_name(event, sender_id)
             target_name = await get_name(event, target_id)
             yield event.plain_result(f"{sender_name} 和 {target_name} 还没有对战记录")
             return
-        
+
         sender_name = await get_name(event, sender_id)
         target_name = await get_name(event, target_id)
-        
+
         total = pvp_stats["total"]
         sender_wins = pvp_stats.get(f"{sender_id}_wins", 0)
         target_wins = pvp_stats.get(f"{target_id}_wins", 0)
-        
+        sender_win_rate = pvp_stats.get(f"{sender_id}_win_rate", 0)
+        target_win_rate = pvp_stats.get(f"{target_id}_win_rate", 0)
+
         reply = f"⚔️ 对战记录\n\n"
         reply += f"{sender_name} VS {target_name}\n\n"
         reply += f"总对战: {total} 局\n"
         reply += f"{sender_name} 获胜: {sender_wins} 局\n"
         reply += f"{target_name} 获胜: {target_wins} 局\n"
-        
+
         if sender_wins > target_wins:
-            reply += f"\n{sender_name} 暂时领先！"
+            reply += f"\n{sender_name} 以胜率 {sender_win_rate:.1f}% 暂时领先！"
         elif target_wins > sender_wins:
-            reply += f"\n{target_name} 暂时领先！"
+            reply += f"\n{target_name} 以胜率 {target_win_rate:.1f}% 暂时领先！"
         else:
             reply += f"\n双方势均力敌！"
-        
+
         yield event.plain_result(reply)
     
     @filter.command("赌圣榜", alias={"赌圣排行榜", "胜率排行"})

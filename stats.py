@@ -129,22 +129,32 @@ class StatsManager:
         with self._lock:
             user1_id, user2_id = sorted([user1_id, user2_id])
             pvp_key = f"{user1_id}_{user2_id}"
-            
+
             pvp_stats = None
             if group_id and group_id in self.stats["groups"]:
                 pvp_stats = self.stats["groups"][group_id]["pvp"].get(pvp_key)
-            
+
             if not pvp_stats and not group_id:
                 pvp_stats = self.stats["pvp"].get(pvp_key)
-            
+
             if not pvp_stats:
                 return None
-            
+
+            user1_wins = pvp_stats.get(f"{user1_id}_wins", 0)
+            user2_wins = pvp_stats.get(f"{user2_id}_wins", 0)
+            total = pvp_stats["total"]
+
+            # 计算胜率
+            user1_win_rate = (user1_wins / total * 100) if total > 0 else 0
+            user2_win_rate = (user2_wins / total * 100) if total > 0 else 0
+
             # 重新排列，让查询者的信息在前
             return {
-                "total": pvp_stats["total"],
-                f"{user1_id}_wins": pvp_stats.get(f"{user1_id}_wins", 0),
-                f"{user2_id}_wins": pvp_stats.get(f"{user2_id}_wins", 0)
+                "total": total,
+                f"{user1_id}_wins": user1_wins,
+                f"{user2_id}_wins": user2_wins,
+                f"{user1_id}_win_rate": user1_win_rate,
+                f"{user2_id}_win_rate": user2_win_rate
             }
     
     def get_top_players(self, group_id: str = None, min_games: int = 5, limit: int = 5) -> List[Tuple[str, float, Dict]]:
