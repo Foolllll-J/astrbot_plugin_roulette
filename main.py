@@ -464,7 +464,6 @@ class RoulettePlugin(Star):
             return
         
         reply = "🏆 赌圣排行榜 TOP5\n"
-        reply += "（至少参与5局）\n\n"
         
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         
