@@ -181,3 +181,43 @@ class StatsManager:
             qualified_users.sort(key=lambda x: x[1], reverse=True)
             
             return qualified_users[:limit]
+
+    def get_unlucky_players(self, group_id: str = None, min_games: int = 5, limit: int = 5) -> List[Tuple[str, float, Dict]]:
+        """
+        获取散财排行榜（胜率最低）
+        """
+        with self._lock:
+            qualified_users = []
+            
+            source = self.stats["users"]
+            if group_id and group_id in self.stats["groups"]:
+                source = self.stats["groups"][group_id]["users"]
+            
+            for user_id, stats in source.items():
+                if stats["total"] >= min_games:
+                    win_rate = stats["wins"] / stats["total"] if stats["total"] > 0 else 0
+                    qualified_users.append((user_id, win_rate, stats))
+            
+            # 按胜率升序排序
+            qualified_users.sort(key=lambda x: x[1])
+            
+            return qualified_users[:limit]
+
+    def get_active_players(self, group_id: str = None, limit: int = 5) -> List[Tuple[str, int, Dict]]:
+        """
+        获取赌狗排行榜（参与局数最多）
+        """
+        with self._lock:
+            qualified_users = []
+            
+            source = self.stats["users"]
+            if group_id and group_id in self.stats["groups"]:
+                source = self.stats["groups"][group_id]["users"]
+            
+            for user_id, stats in source.items():
+                qualified_users.append((user_id, stats["total"], stats))
+            
+            # 按参与局数降序排序
+            qualified_users.sort(key=lambda x: x[1], reverse=True)
+            
+            return qualified_users[:limit]

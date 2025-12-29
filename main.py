@@ -478,6 +478,55 @@ class RoulettePlugin(Star):
             reply += f"   最高连胜: {max_streak}\n\n"
         
         yield event.plain_result(reply)
+
+    @filter.command("散财榜", alias={"散财排行榜", "倒霉榜", "输家榜"})
+    async def unlucky_players(self, event: AstrMessageEvent):
+        """查看散财排行榜（胜率最低，至少参与5局）"""
+        group_id = event.get_group_id()
+        top_list = self.stats.get_unlucky_players(group_id=group_id, min_games=5, limit=5)
+        
+        if not top_list:
+            yield event.plain_result("暂时还没有符合条件的散财达人（至少参与5局）")
+            return
+        
+        reply = "💸 散财排行榜 TOP5\n"
+        
+        medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+        
+        for idx, (user_id, win_rate, stats) in enumerate(top_list):
+            user_name = await get_name(event, user_id)
+            total = stats["total"]
+            wins = stats["wins"]
+            losses = stats["losses"]
+            
+            reply += f"{medals[idx]} {user_name}\n"
+            reply += f"   胜率: {win_rate*100:.1f}% (胜{wins}/负{losses})\n\n"
+        
+        yield event.plain_result(reply)
+
+    @filter.command("赌狗榜", alias={"赌狗排行榜"})
+    async def active_players(self, event: AstrMessageEvent):
+        """查看赌狗排行榜（参与局数最多）"""
+        group_id = event.get_group_id()
+        top_list = self.stats.get_active_players(group_id=group_id, limit=5)
+        
+        if not top_list:
+            yield event.plain_result("暂时还没有战绩记录")
+            return
+        
+        reply = "🐶 赌狗排行榜 TOP5\n"
+        
+        medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+        
+        for idx, (user_id, total, stats) in enumerate(top_list):
+            user_name = await get_name(event, user_id)
+            wins = stats["wins"]
+            losses = stats["losses"]
+            
+            reply += f"{medals[idx]} {user_name}\n"
+            reply += f"   总局数: {total} (胜{wins}/负{losses})\n\n"
+        
+        yield event.plain_result(reply)
     
     @filter.command("转盘帮助", alias={"轮盘帮助"})
     async def roulette_help(self, event: AstrMessageEvent):
@@ -494,7 +543,9 @@ class RoulettePlugin(Star):
 📊 战绩查询
 • /我的战绩 - 查看个人战绩统计
 • /对战记录@群友 - 查看与某人的对战记录
-• /赌圣榜 - 查看胜率排行榜TOP5
+• /赌圣榜 - 查看胜率最高排行榜TOP5
+• /散财榜 - 查看胜率最低排行榜TOP5
+• /赌狗榜 - 查看参与局数排行榜TOP5
 
 🛡️ 管理员指令
 • /结束转盘 - 强制结束多人游戏（不影响双人对决）
