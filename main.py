@@ -472,7 +472,7 @@ class RoulettePlugin(Star):
             yield event.plain_result("当前群暂时还没有符合条件的赌圣（至少参与5局）")
             return
         
-        reply = "🏆 赌圣排行榜 TOP5\n"
+        reply = "🏆 赌圣排行榜 TOP5\n\n"
         
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         
@@ -506,7 +506,7 @@ class RoulettePlugin(Star):
             yield event.plain_result("当前群暂时还没有符合条件的散财达人（至少参与5局）")
             return
         
-        reply = "💸 散财排行榜 TOP5\n"
+        reply = "💸 散财排行榜 TOP5\n\n"
         
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         
@@ -539,7 +539,7 @@ class RoulettePlugin(Star):
             yield event.plain_result("暂时还没有战绩记录")
             return
         
-        reply = "🐶 赌狗排行榜 TOP5\n"
+        reply = "🐶 赌狗排行榜 TOP5\n\n"
         
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         
