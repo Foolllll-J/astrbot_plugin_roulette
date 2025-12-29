@@ -457,18 +457,26 @@ class RoulettePlugin(Star):
     async def top_players(self, event: AstrMessageEvent):
         """查看胜率排行榜（至少参与5局）"""
         group_id = event.get_group_id()
-        top_list = self.stats.get_top_players(group_id=group_id, min_games=5, limit=5)
+        # 获取全局前 100 名，然后从中筛选出在当前群的
+        all_top_list = self.stats.get_top_players(group_id=None, min_games=5, limit=100)
         
-        if not top_list:
-            yield event.plain_result("暂时还没有符合条件的赌圣（至少参与5局）")
+        qualified_list = []
+        for user_id, win_rate, stats in all_top_list:
+            user_name = await get_name(event, user_id, group_id)
+            if user_name:
+                qualified_list.append((user_id, win_rate, stats, user_name))
+            if len(qualified_list) >= 5:
+                break
+        
+        if not qualified_list:
+            yield event.plain_result("当前群暂时还没有符合条件的赌圣（至少参与5局）")
             return
         
         reply = "🏆 赌圣排行榜 TOP5\n"
         
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         
-        for idx, (user_id, win_rate, stats) in enumerate(top_list):
-            user_name = await get_name(event, user_id)
+        for idx, (user_id, win_rate, stats, user_name) in enumerate(qualified_list):
             total = stats["total"]
             wins = stats["wins"]
             max_streak = stats["max_win_streak"]
@@ -483,18 +491,26 @@ class RoulettePlugin(Star):
     async def unlucky_players(self, event: AstrMessageEvent):
         """查看散财排行榜（胜率最低，至少参与5局）"""
         group_id = event.get_group_id()
-        top_list = self.stats.get_unlucky_players(group_id=group_id, min_games=5, limit=5)
+        # 获取全局排名，筛选出在当前群的
+        all_top_list = self.stats.get_unlucky_players(group_id=None, min_games=5, limit=100)
         
-        if not top_list:
-            yield event.plain_result("暂时还没有符合条件的散财达人（至少参与5局）")
+        qualified_list = []
+        for user_id, win_rate, stats in all_top_list:
+            user_name = await get_name(event, user_id, group_id)
+            if user_name:
+                qualified_list.append((user_id, win_rate, stats, user_name))
+            if len(qualified_list) >= 5:
+                break
+        
+        if not qualified_list:
+            yield event.plain_result("当前群暂时还没有符合条件的散财达人（至少参与5局）")
             return
         
         reply = "💸 散财排行榜 TOP5\n"
         
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         
-        for idx, (user_id, win_rate, stats) in enumerate(top_list):
-            user_name = await get_name(event, user_id)
+        for idx, (user_id, win_rate, stats, user_name) in enumerate(qualified_list):
             total = stats["total"]
             wins = stats["wins"]
             losses = stats["losses"]
@@ -508,9 +524,18 @@ class RoulettePlugin(Star):
     async def active_players(self, event: AstrMessageEvent):
         """查看赌狗排行榜（参与局数最多）"""
         group_id = event.get_group_id()
-        top_list = self.stats.get_active_players(group_id=group_id, limit=5)
+        # 获取全局排名，筛选出在当前群的
+        all_top_list = self.stats.get_active_players(group_id=None, limit=100)
         
-        if not top_list:
+        qualified_list = []
+        for user_id, total, stats in all_top_list:
+            user_name = await get_name(event, user_id, group_id)
+            if user_name:
+                qualified_list.append((user_id, total, stats, user_name))
+            if len(qualified_list) >= 5:
+                break
+        
+        if not qualified_list:
             yield event.plain_result("暂时还没有战绩记录")
             return
         
@@ -518,8 +543,7 @@ class RoulettePlugin(Star):
         
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         
-        for idx, (user_id, total, stats) in enumerate(top_list):
-            user_name = await get_name(event, user_id)
+        for idx, (user_id, total, stats, user_name) in enumerate(qualified_list):
             wins = stats["wins"]
             losses = stats["losses"]
             
