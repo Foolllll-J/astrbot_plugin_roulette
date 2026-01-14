@@ -74,8 +74,8 @@ class RoulettePlugin(Star):
                     self.gm.del_room(group_id=group_id)
                 
                 # 发送超时提示
-                timeout_msg = f"⏱️ 转盘游戏超时（{self.game_timeout}秒无人开枪），已自动结束，无人受罚。"
-                await event.send(MessageChain([Comp_Plain(timeout_msg)]))
+                # timeout_msg = f"⏱️ 转盘游戏超时（{self.game_timeout}秒无人开枪），已自动结束，无人受罚。"
+                # await event.send(MessageChain([Comp_Plain(timeout_msg)]))
                 
                 if group_id in self.game_timeout_tasks:
                     del self.game_timeout_tasks[group_id]
@@ -230,7 +230,8 @@ class RoulettePlugin(Star):
                     yield event.chain_result(chain)
                 
                 if is_last_round:
-                    asyncio.create_task(self._task_auto_surrender(event, next_player_id, group_id, room))
+                    task = asyncio.create_task(self._task_auto_surrender(event, next_player_id, group_id, room))
+                    self.timeout_tasks[group_id] = task
             else:
                 # 多人模式，没有指定下一个玩家
                 yield event.plain_result(reply)
@@ -268,6 +269,9 @@ class RoulettePlugin(Star):
             self.gm.del_room(group_id=group_id, players=room.players)
             if group_id in self.timeout_tasks:
                 del self.timeout_tasks[group_id]
+            if group_id in self.game_timeout_tasks:
+                self.game_timeout_tasks[group_id].cancel()
+                del self.game_timeout_tasks[group_id]
         except asyncio.CancelledError:
             logger.info(f"群 {group_id} 的超时任务被取消。")
         except Exception as e:
