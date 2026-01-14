@@ -1,4 +1,3 @@
-
 from astrbot.core.message.components import At
 from astrbot.core.platform.astr_message_event import AstrMessageEvent
 from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import (
@@ -52,14 +51,25 @@ def get_at_id(event: AstrMessageEvent) -> str:
     )
 
 
-async def ban(event: AstrMessageEvent, duration: int):
+async def ban(event: AstrMessageEvent, duration: int, user_id: str|int = None):
+    """
+    禁言用户
+    :param event: 消息事件
+    :param duration: 禁言时长（秒）
+    :param user_id: 要禁言的用户ID，如果不传则禁言消息发送者
+    """
     if event.get_platform_name() == "aiocqhttp":
         assert isinstance(event, AiocqhttpMessageEvent)
         try:
+            # 如果未指定 user_id，默认禁言消息发送者
+            target_user_id = user_id if user_id is not None else event.get_sender_id()
+            
             await event.bot.set_group_ban(
                 group_id=int(event.get_group_id()),
-                user_id=int(event.get_sender_id()),
+                user_id=int(target_user_id),
                 duration=duration,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            # 禁言失败时记录错误但不中断流程
+            from astrbot import logger
+            logger.error(f"禁言用户 {target_user_id} 失败: {e}")

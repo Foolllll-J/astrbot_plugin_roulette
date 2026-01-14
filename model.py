@@ -19,7 +19,6 @@ class Room:
     def over(self) -> bool:
         return self.round >= self.bullet
 
-
     def can_shoot(self, shooter: str):
         if self.players and isinstance(self.next_idx, int):
             return shooter == self.players[self.next_idx]
@@ -67,7 +66,6 @@ class GameManager:
         self._lock = threading.Lock()
         self.room: Dict[str, Room] = {}  # player_id -> room 实例
 
-
     def create_room(
         self, kids: list[str], ban_time: int = 0
     ) -> Room | None:
@@ -93,7 +91,6 @@ class GameManager:
                 self.room[k_group] = room
                 return room
 
-
     def get_room(self, kids: list[str]) -> Room | None:
         """获取房间"""
         sender_id, target_id, group_id = kids[0], kids[1], kids[2]
@@ -105,7 +102,6 @@ class GameManager:
             if group_id:
                 if room := self.room.get(f"{group_id}:group"): return room
             return None
-
 
     def has_room(self, kid: str, group_id: str) -> bool:
         """玩家是否已在房间"""
@@ -124,9 +120,3 @@ class GameManager:
             k_group = f"{group_id}:group"
             if k_group in self.room:
                 self.room.pop(k_group)
-
-
-
-
-
-

@@ -1,6 +1,6 @@
 import random
 import asyncio
-from astrbot.api.event import filter
+from astrbot.api.event import filter, MessageChain
 from astrbot.api.star import Context, Star, register, StarTools
 from astrbot.api.message_components import Plain as Comp_Plain, At as Comp_At
 from astrbot.core.config.astrbot_config import AstrBotConfig
@@ -40,7 +40,7 @@ class RoulettePlugin(Star):
             "小赌怡情，大赌伤身，强赌灰飞烟灭",
             "赌狗赌到最后一无所有，你确定要继续吗？",
             "十赌九输，清醒点",
-            "'赌'字上'贝'下'者'，'贝者'即背着债务的人",
+            "‘赌’字上‘贝’下‘者’，‘贝者’即背着债务的人",
             "常在河边走，哪有不湿鞋?",
             "赌博之害，你岂能不知",
             "一次戒赌，终生受益",
@@ -75,7 +75,7 @@ class RoulettePlugin(Star):
                 
                 # 发送超时提示
                 timeout_msg = f"⏱️ 转盘游戏超时（{self.game_timeout}秒无人开枪），已自动结束，无人受罚。"
-                await event.yield_result(event.plain(timeout_msg))
+                await event.send(MessageChain([Comp_Plain(timeout_msg)]))
                 
                 if group_id in self.game_timeout_tasks:
                     del self.game_timeout_tasks[group_id]
@@ -125,7 +125,7 @@ class RoulettePlugin(Star):
             if self.gm.has_room(sender_id, group_id): reply = "你在游戏中..."
             if target_id and self.gm.has_room(target_id, group_id): reply = "对方游戏中..."
             # 双人转盘和多人转盘可以并存，不检查群游戏
-            if not target_id and self.gm.get_room(["", "", group_id]): 
+            if not target_id and self.gm.get_room(["", "", group_id]):
                 reply = "本群游戏中..."
             yield event.plain_result(reply)
             return
@@ -230,43 +230,48 @@ class RoulettePlugin(Star):
                     yield event.chain_result(chain)
                 
                 if is_last_round:
-                    async def auto_surrender_coro():
-                        try:
-                            await asyncio.sleep(180) # 等待3分钟
-                            logger.info(f"玩家 {player_name}({next_player_id}) 在群 {group_id} 的游戏超时。")
-                            
-                            # 记录战绩
-                            all_participants = room.get_all_participants()
-                            winner_ids = [p for p in all_participants if p != next_player_id]
-                            is_pvp = len(room.players) == 2
-                            
-                            # 多人模式只记录败者，不记录胜者
-                            if not is_pvp:
-                                winner_ids = []
-                                
-                            self.stats.record_game_result(next_player_id, winner_ids, is_pvp, group_id)
-                            
-                            timeout_event = event.fork(user_id=next_player_id)
-                            await ban(timeout_event, room.ban_time)
-                            timeout_reply = (
-                                f"玩家 {player_name} 在命运抉择面前犹豫了超过3分钟，已自动判负！\n"
-                                f"被禁言 {room.ban_time} 秒！{random.choice(self.PERSUASION_QUOTES)}"
-                            )
-                            await event.yield_result(event.plain(timeout_reply))
-                            # 使用包含所有参与者的列表来清理房间
-                            self.gm.del_room(group_id=group_id, players=room.players)
-                            if group_id in self.timeout_tasks:
-                                del self.timeout_tasks[group_id]
-                        except asyncio.CancelledError:
-                            logger.info(f"群 {group_id} 的超时任务被取消。")
-                    
-                    self.timeout_tasks[group_id] = asyncio.create_task(auto_surrender_coro())
+                    asyncio.create_task(self._task_auto_surrender(event, next_player_id, group_id, room))
             else:
                 # 多人模式，没有指定下一个玩家
                 yield event.plain_result(reply)
             
             # 重新设置游戏超时（没中枪，游戏继续）
             self._set_game_timeout(event, group_id, room)
+    
+    async def _task_auto_surrender(self, event: AstrMessageEvent, next_player_id: str, group_id: str, room):
+        """最后一发超时自动认输任务，参考 filechecker 的延时复核实现"""
+        try:
+            player_name = await get_name(event, next_player_id)
+            await asyncio.sleep(180)
+            logger.info(f"玩家 {player_name}({next_player_id}) 在群 {group_id} 的游戏超时。")
+            
+            # 记录战绩
+            all_participants = room.get_all_participants()
+            winner_ids = [p for p in all_participants if p != next_player_id]
+            is_pvp = len(room.players) == 2
+            
+            # 多人模式只记录败者，不记录胜者
+            if not is_pvp:
+                winner_ids = []
+            
+            self.stats.record_game_result(next_player_id, winner_ids, is_pvp, group_id)
+            
+            await ban(event, room.ban_time, user_id=next_player_id)
+            
+            timeout_reply = (
+                f"玩家 {player_name} 在命运抉择面前犹豫了过久，已降下神罚！\n"
+                f"被禁言 {room.ban_time} 秒！"
+            )
+            await event.send(MessageChain([Comp_Plain(timeout_reply)]))
+            
+            # 使用包含所有参与者的列表来清理房间
+            self.gm.del_room(group_id=group_id, players=room.players)
+            if group_id in self.timeout_tasks:
+                del self.timeout_tasks[group_id]
+        except asyncio.CancelledError:
+            logger.info(f"群 {group_id} 的超时任务被取消。")
+        except Exception as e:
+            logger.error(f"执行超时自动认输任务时出错: {e}", exc_info=True)
     
     @filter.command("认输", alias={"玩不起"})
     async def surrender_game(self, event: AstrMessageEvent):
@@ -302,7 +307,7 @@ class RoulettePlugin(Star):
         # 多人模式只记录败者，不记录胜者
         if not is_pvp:
             winner_ids = []
-            
+        
         self.stats.record_game_result(user_id, winner_ids, is_pvp, group_id)
         
         await ban(event, room.ban_time)
