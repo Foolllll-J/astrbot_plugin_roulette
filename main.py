@@ -1,22 +1,18 @@
 import random
 import asyncio
+
+from astrbot import logger
 from astrbot.api.event import filter, MessageChain
-from astrbot.api.star import Context, Star, register, StarTools
+from astrbot.api.star import Context, Star, StarTools
 from astrbot.api.message_components import Plain as Comp_Plain, At as Comp_At
 from astrbot.core.config.astrbot_config import AstrBotConfig
-from astrbot import logger
 from astrbot.core.platform.astr_message_event import AstrMessageEvent
-from .utils import ban, get_at_id, get_name
-from .model import GameManager
-from .stats import StatsManager
+
+from .core.utils import ban, get_at_id, get_name
+from .core.model import GameManager
+from .core.stats import StatsManager
 
 
-@register(
-    "astrbot_plugin_roulette",
-    "Zhalslar",
-    "俄罗斯转盘赌，中枪者禁言",
-    "1.1.0"
-)
 class RoulettePlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -133,14 +129,15 @@ class RoulettePlugin(Star):
         if room.players:
             user_name = await get_name(event, sender_id)
             target_name = await get_name(event, target_id) if target_id else ""
-            # 使用chain格式，@发起者并说明规则
+            # 使用chain格式，@随机先手并说明规则
             chain = []
+            first_player_id = room.players[room.next_idx] if room.next_idx is not None else sender_id
             if custom_duration:
-                text = f"🎲 {user_name} VS {target_name}\n双人转盘对决开始！惩罚时长：{duration}秒\n发起者先手，"
+                text = f"🎲 {user_name} VS {target_name}\n双人转盘对决开始！惩罚时长：{duration}秒\n随机先手，"
             else:
-                text = f"🎲 {user_name} VS {target_name}\n双人转盘对决开始！\n发起者先手，"
+                text = f"🎲 {user_name} VS {target_name}\n双人转盘对决开始！\n随机先手，"
             chain.append(Comp_Plain(text))
-            chain.append(Comp_At(qq=sender_id))
+            chain.append(Comp_At(qq=first_player_id))
             chain.append(Comp_Plain(" 请先开枪！"))
             yield event.chain_result(chain)
         else:
@@ -567,7 +564,7 @@ class RoulettePlugin(Star):
         help_text = """🎰 俄罗斯转盘游戏帮助
 
 📌 基础玩法
-• /转盘@群友 [秒数] - 双人对决，发起者先手
+• /转盘@群友 [秒数] - 双人对决，随机先手
 • /转盘 [秒数] - 多人模式，每人只能开一枪
 • /开枪 - 向自己开一枪
 • /认输 或 /玩不起 - 主动认输接受惩罚
@@ -585,7 +582,7 @@ class RoulettePlugin(Star):
 
 💡 游戏规则
 • 转盘有6发子弹位，随机一发是实弹
-• 双人模式发起者先手，轮流开枪
+• 双人模式随机先手，轮流开枪
 • 多人模式每人限开一枪
 • 可在@后加秒数自定义禁言时长（最高24小时）
 • 中枪者会被禁言，时长可自定义或随机

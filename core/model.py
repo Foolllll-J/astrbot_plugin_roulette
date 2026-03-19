@@ -1,18 +1,18 @@
 import random
 import threading
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 
 class Room:
     """内部房间类，不对外暴露 room_id"""
 
-    def __init__(self, players: List[str], ban_time:int):
+    def __init__(self, players: list[str], ban_time:int):
         self.players = players
         self.ban_time = ban_time
         self.bullet = random.randint(1, 6)
         self.round = 0
-        # 双人模式：发起者（players[0]）先手
-        self.next_idx: Optional[int] = 0 if players else None
+        # 双人模式：随机先手
+        self.next_idx: Optional[int] = random.randint(0, 1) if players else None
         self.participated: set = set()  # 记录多人模式下已参与的玩家
 
     @property
@@ -64,7 +64,7 @@ class Room:
 class GameManager:
     def __init__(self):
         self._lock = threading.Lock()
-        self.room: Dict[str, Room] = {}  # player_id -> room 实例
+        self.room: dict[str, Room] = {}  # player_id -> room 实例
 
     def create_room(
         self, kids: list[str], ban_time: int = 0
