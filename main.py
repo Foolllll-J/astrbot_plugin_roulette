@@ -402,13 +402,13 @@ class RoulettePlugin(Star):
         max_streak = stats["max_win_streak"]
         current_streak = stats["current_streak"]
         
-        reply = f"🎰 {user_name} 的转盘战绩\n\n"
+        reply = f"🎰 {user_name} 的转盘战绩\n\u200b\n"
         reply += f"参与局数: {total}\n"
         reply += f"获胜次数: {wins} (未中枪)\n"
         reply += f"失败次数: {losses} (中枪)\n"
         reply += f"胜率: {win_rate:.1f}%\n"
         reply += f"最高连胜: {max_streak} 连胜\n"
-        reply += f"当前连胜: {current_streak} 连胜" if current_streak > 0 else f"当前连胜: 0"
+        reply += f"当前连胜: {current_streak} 连胜"
         
         yield event.plain_result(reply)
     
@@ -444,18 +444,18 @@ class RoulettePlugin(Star):
         sender_win_rate = pvp_stats.get(f"{sender_id}_win_rate", 0)
         target_win_rate = pvp_stats.get(f"{target_id}_win_rate", 0)
 
-        reply = f"⚔️ 对战记录\n\n"
-        reply += f"{sender_name} VS {target_name}\n\n"
+        reply = f"⚔️ 对战记录\n\u200b\n"
+        reply += f"{sender_name} VS {target_name}\n\u200b\n"
         reply += f"总对战: {total} 局\n"
         reply += f"{sender_name} 获胜: {sender_wins} 局\n"
-        reply += f"{target_name} 获胜: {target_wins} 局\n"
+        reply += f"{target_name} 获胜: {target_wins} 局\n\u200b\n"
 
         if sender_wins > target_wins:
-            reply += f"\n{sender_name} 以胜率 {sender_win_rate:.1f}% 暂时领先！"
+            reply += f"{sender_name} 以胜率 {sender_win_rate:.1f}% 暂时领先！"
         elif target_wins > sender_wins:
-            reply += f"\n{target_name} 以胜率 {target_win_rate:.1f}% 暂时领先！"
+            reply += f"{target_name} 以胜率 {target_win_rate:.1f}% 暂时领先！"
         else:
-            reply += f"\n双方势均力敌！"
+            reply += f"双方势均力敌！"
 
         yield event.plain_result(reply)
     
@@ -478,7 +478,7 @@ class RoulettePlugin(Star):
             yield event.plain_result("当前群暂时还没有符合条件的赌圣（至少参与5局）")
             return
         
-        reply = "🏆 赌圣排行榜 TOP5\n\n"
+        reply = "🏆 赌圣排行榜 TOP5\n\u200b\n"
         
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         
@@ -489,7 +489,7 @@ class RoulettePlugin(Star):
             
             reply += f"{medals[idx]} {user_name}\n"
             reply += f"   胜率: {win_rate*100:.1f}% ({wins}/{total})\n"
-            reply += f"   最高连胜: {max_streak}\n\n"
+            reply += f"   最高连胜: {max_streak}\n\u200b\n"
         
         yield event.plain_result(reply)
 
@@ -512,7 +512,7 @@ class RoulettePlugin(Star):
             yield event.plain_result("当前群暂时还没有符合条件的散财达人（至少参与5局）")
             return
         
-        reply = "💸 散财排行榜 TOP5\n\n"
+        reply = "💸 散财排行榜 TOP5\n\u200b\n"
         
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         
@@ -522,7 +522,7 @@ class RoulettePlugin(Star):
             losses = stats["losses"]
             
             reply += f"{medals[idx]} {user_name}\n"
-            reply += f"   胜率: {win_rate*100:.1f}% (胜{wins}/负{losses})\n\n"
+            reply += f"   胜率: {win_rate*100:.1f}% (胜{wins}/负{losses})\n\u200b\n"
         
         yield event.plain_result(reply)
 
@@ -545,7 +545,7 @@ class RoulettePlugin(Star):
             yield event.plain_result("暂时还没有战绩记录")
             return
         
-        reply = "🐶 赌狗排行榜 TOP5\n\n"
+        reply = "🐶 赌狗排行榜 TOP5\n\u200b\n"
         
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         
@@ -554,7 +554,7 @@ class RoulettePlugin(Star):
             losses = stats["losses"]
             
             reply += f"{medals[idx]} {user_name}\n"
-            reply += f"   总局数: {total} (胜{wins}/负{losses})\n\n"
+            reply += f"   总局数: {total} (胜{wins}/负{losses})\n\u200b\n"
         
         yield event.plain_result(reply)
     
